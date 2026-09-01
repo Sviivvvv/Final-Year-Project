@@ -90,15 +90,13 @@ const EMPTY_FIELDS = {
 // ---------------------------------------------------------------------------
 
 function shortIssueTag(issue = '') {
-  const SKIP = new Set(['the','a','an','there','is','it','no','not','too','are','report','lacks']);
-  const words = issue.split(' ').filter(w => !SKIP.has(w.toLowerCase()));
-  let tag = '';
-  for (const w of words) {
-    const next = tag ? `${tag} ${w}` : w;
-    if (next.length > 14) break;
-    tag = next;
-  }
-  return tag || issue.slice(0, 12);
+  const text = issue.toLowerCase();
+  if (/step|reproduc|precondition|login|setup/.test(text)) return 'Missing steps';
+  if (/vague|unclear|specific|generic|detail/.test(text))  return 'Too vague';
+  if (/expect|outcome|success|should/.test(text))          return 'Unclear expected result';
+  if (/error|message|symptom|screenshot/.test(text))       return 'No error detail';
+  if (/contradict|inconsist|mismatch/.test(text))          return 'Inconsistent';
+  return 'Needs detail';
 }
 
 /**

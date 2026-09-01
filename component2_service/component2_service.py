@@ -108,6 +108,29 @@ def _format_component1_context(component1_context: Union[dict, str, None]) -> st
     return "\n".join(lines) if lines else json.dumps(component1_context)
 
 
+def _normalize_recommendations(recs: list, report_text: str) -> list:
+    """
+    Safety net for the sentence_reference schema rule: if the model still
+    returns a bare section label ('OB', 'EB', 'S2R') with no sentence text
+    despite the prompt instruction, expand it to include the full section
+    text pulled from the raw report, so the UI never shows an unhelpful
+    bare label.
+    """
+    bare_labels = {"OB", "EB", "S2R"}
+    section_pattern = {
+        "OB": re.compile(r"OB:\s*(.+?)(?=\n[A-Z]{2,3}:|\Z)", re.DOTALL),
+        "EB": re.compile(r"EB:\s*(.+?)(?=\n[A-Z]{2,3}:|\Z)", re.DOTALL),
+        "S2R": re.compile(r"S2R:\s*(.+?)(?=\n[A-Z]{2,3}:|\Z)", re.DOTALL),
+    }
+    for r in recs:
+        ref = (r.get("sentence_reference") or "").strip()
+        if ref in bare_labels:
+            match = section_pattern[ref].search(report_text)
+            section_text = match.group(1).strip() if match else "(section text not found)"
+            r["sentence_reference"] = f"{ref}: {section_text}"
+    return recs
+
+
 # ---------------------------------------------------------------------------
 # The core entry point
 # ---------------------------------------------------------------------------
@@ -190,7 +213,7 @@ def score_report(
         "total_score": total_score,
         "passed": total_score >= PASS_THRESHOLD,
         "dimension_scores": parsed.get("dimension_scores", {}),
-        "recommendations": parsed.get("recommendations", []),
+        "recommendations": _normalize_recommendations(parsed.get("recommendations", []), report_text),
         "reasoning": parsed.get("reasoning"),
         "deductions_applied": parsed.get("deductions_applied", []),
         "parsed_ok": True,

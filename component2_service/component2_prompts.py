@@ -109,7 +109,14 @@ OUTPUT_SCHEMA_TEXT = dedent("""\
          "evidence": "<quoted or paraphrased sentence that triggered this>"}
       ],
       "recommendations": [
-        {"sentence_reference": "<quoted sentence or section name>",
+        {"sentence_reference": "<the section label AND the exact sentence
+          text this recommendation targets, in the form 'SECTION: sentence
+          text', e.g. 'S2R: Open app.' or 'EB: The order should save
+          correctly.' NEVER return just the bare section label ('OB', 'EB',
+          or 'S2R') with no sentence text — if the issue applies to the
+          whole section rather than one sentence, still include the full
+          section text after the colon so the reporter can see exactly what
+          is being critiqued.>",
          "issue": "<what is wrong, one sentence>",
          "suggested_fix": "<concrete suggested rewrite or missing info to add>"}
       ]
@@ -121,7 +128,6 @@ OUTPUT_SCHEMA_TEXT = dedent("""\
     follow it — do not backfill the reasoning to justify a score you already
     picked.
 """)
-
 
 # ---------------------------------------------------------------------------
 # Structured prompt (persona + explicit rubric + explicit output format)
