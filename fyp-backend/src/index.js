@@ -24,6 +24,8 @@ const morgan       = require('morgan');
 const { getDb, closeDb } = require('./db');
 const reportsRoute = require('./routes/reports');
 const authRoute     = require('./routes/auth');
+const adminRoute    = require('./routes/admin');
+const { seedUsers } = require('./middleware/auth');
 
 // ---------------------------------------------------------------------------
 // 1. Validate required env vars before doing anything else
@@ -62,6 +64,21 @@ app.get('/health', (req, res) => {
 
 app.use('/auth',    authRoute);
 app.use('/reports', reportsRoute);
+app.use('/admin',   adminRoute);
+
+// ---------------------------------------------------------------------------
+// 3b. Built frontend (optional): if fyp-frontend/dist exists (npm run build), serve
+//     it from this same port so the whole app is reachable at one address, e.g.
+//     through a tunnel or a single-service host. API routes above take priority.
+// ---------------------------------------------------------------------------
+const path = require('path');
+const fs   = require('fs');
+const DIST = path.resolve(__dirname, '../../fyp-frontend/dist');
+if (fs.existsSync(path.join(DIST, 'index.html'))) {
+  app.use(express.static(DIST, { maxAge: '1h', index: false }));
+  app.get(/^\/(?!auth|reports|admin|health).*/, (req, res) => res.sendFile(path.join(DIST, 'index.html')));
+  console.log(`[Static] Serving built frontend from ${DIST}`);
+}
 
 // ---------------------------------------------------------------------------
 // 4. Catch-all 404
@@ -85,6 +102,7 @@ app.use((err, req, res, next) => {
 (async () => {
   try {
     await getDb();  // fail fast — exits with clear error if URI is wrong
+    await seedUsers();
   } catch (err) {
     console.error('\n[Startup error] Could not connect to MongoDB Atlas:', err.message);
     console.error('Check your MONGODB_URI in .env and that your IP is whitelisted in Atlas.\n');

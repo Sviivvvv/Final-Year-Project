@@ -33,13 +33,47 @@ async function getDb() {
   }
 
   client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (err) {
+    // Some home / campus DNS servers cannot answer the SRV lookup that mongodb+srv:// URIs need
+    // (error code ESERVFAIL / ECONNREFUSED from querySrv). Retry once through public resolvers.
+    if (!/querySrv|ESERVFAIL|ENOTFOUND/.test(String(err?.message) + String(err?.code))) throw err;
+    console.warn('[DB] System DNS could not resolve the Atlas address; retrying with public DNS (8.8.8.8, 1.1.1.1).');
+    require('dns').setServers(['8.8.8.8', '1.1.1.1']);
+    await client.close().catch(() => {});
+    client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+  }
 
   const dbName = process.env.MONGODB_DB_NAME || 'fyp_poc';
   dbHandle = client.db(dbName);
 
   console.log(`[DB] Connected to MongoDB Atlas — database: "${dbName}"`);
+  await ensureIndexes(dbHandle);
   return dbHandle;
+}
+
+/**
+ * The unique (thread_id, attempt_number) index is the cross-process guard
+ * against two simultaneous resubmissions both claiming the same attempt
+ * number (see routes/reports.js). If legacy data already violates it the
+ * index build fails; we warn and carry on rather than refusing to start.
+ */
+async function ensureIndexes(db) {
+  const specs = [
+    // Partial: reports saved before the resubmission loop existed have no thread_id.
+    ['reports', { thread_id: 1, attempt_number: 1 }, { unique: true, partialFilterExpression: { thread_id: { $type: 'string' } } }],
+    ['reports', { user_email: 1, submitted_at: -1 }, {}],
+    ['users',   { email: 1 }, { unique: true }],
+  ];
+  for (const [coll, keys, opts] of specs) {
+    try {
+      await db.collection(coll).createIndex(keys, opts);
+    } catch (err) {
+      console.warn(`[DB] Index warning on ${coll}:`, err.message);
+    }
+  }
 }
 
 /**

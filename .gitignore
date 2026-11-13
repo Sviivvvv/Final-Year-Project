@@ -8,3 +8,10 @@ node_modules/
 fyp-backend/env.example
 
 fyp-backend/env.example
+
+# Training artifacts (large / regenerable)
+training/artifacts/
+fyp-frontend/dist/
+fyp-backend/LOCAL_LOGINS.md
+HANDOFF.md
+.claude/
